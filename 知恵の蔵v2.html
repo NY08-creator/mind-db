@@ -1,0 +1,496 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>知恵の蔵 - Reflection Journal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg-main: #f8fafc;
+        }
+        body { 
+            background-color: var(--bg-main); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        input, select, textarea, [contenteditable="true"] {
+            font-size: 16px !important;
+        }
+
+
+        .editor-content, .display-content { 
+            min-height: 1.5em;
+            outline: none;
+            word-break: break-word;
+        }
+        .editor-content:empty:before {
+            content: attr(placeholder);
+            color: #cbd5e1;
+            cursor: text;
+        }
+
+
+        .editor-content ul, .display-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 0.5rem; }
+        .editor-content ol, .display-content ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 0.5rem; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .toolbar-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .toolbar-btn:hover { background-color: #f1f5f9; }
+
+
+        .db-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .line-clamp-custom {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .expanded .line-clamp-custom {
+            display: block;
+            -webkit-line-clamp: none;
+            overflow: visible;
+        }
+
+
+        .filter-chip {
+            padding: 8px 18px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 700;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+            color: #94a3b8;
+            background: white;
+            white-space: nowrap;
+        }
+        .filter-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+        }
+
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            display: inline-block;
+        }
+        .label-fact { background: #f1f5f9; color: #64748b; }
+        .label-abs { background: #eef2ff; color: #4f46e5; }
+        .label-app { background: #ecfdf5; color: #059669; }
+
+
+        .pb-safe { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+    </style>
+</head>
+<body class="pb-safe">
+
+
+    <header class="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-2xl mx-auto flex justify-between items-center">
+            <h1 class="font-black text-xl text-indigo-600 tracking-tighter">MIND DB</h1>
+            <div class="flex items-center gap-2">
+                <input type="date" id="datePicker" class="text-sm font-bold border rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 border-slate-200">
+                <div id="exportMenuBtn" class="relative hidden">
+                    <button onclick="toggleExportMenu()" class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-indigo-600"><i class="fas fa-ellipsis-v"></i></button>
+                    <div id="exportMenu" class="absolute right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 hidden overflow-hidden">
+                        <button onclick="copyToClipboard()" class="w-full text-left px-5 py-4 text-sm hover:bg-slate-50 flex items-center gap-3">
+                            <i class="far fa-copy w-4 text-slate-400"></i>テキストをコピー
+                        </button>
+                        <button onclick="exportJSON()" class="w-full text-left px-5 py-4 text-sm hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50">
+                            <i class="fas fa-file-download w-4 text-slate-400"></i>JSONバックアップ
+                        </button>
+                        <label class="w-full text-left px-5 py-4 text-sm hover:bg-indigo-50 flex items-center gap-3 cursor-pointer text-indigo-600 font-bold">
+                            <i class="fas fa-file-upload w-4"></i>データを復元
+                            <input type="file" accept=".json" class="hidden" onchange="importJSON(event)">
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <main id="app" class="max-w-2xl mx-auto p-4 sm:p-6">
+        <!-- Content injected by JS -->
+    </main>
+
+
+    <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur text-white px-8 py-3.5 rounded-full text-sm font-bold shadow-2xl opacity-0 transition-opacity pointer-events-none z-[60]">
+        コピーしました
+    </div>
+
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-slate-100 flex justify-around p-3 pb-safe-extra shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-50">
+        <button onclick="switchTab('edit')" id="tabEdit" class="flex flex-col items-center gap-1 w-20 transition-all">
+            <i class="fas fa-edit text-xl"></i><span class="text-[10px] font-black uppercase tracking-widest">記録</span>
+        </button>
+        <button onclick="switchTab('db')" id="tabDb" class="flex flex-col items-center gap-1 w-20 transition-all">
+            <i class="fas fa-folder-open text-xl"></i><span class="text-[10px] font-black uppercase tracking-widest">知恵の蔵</span>
+        </button>
+    </nav>
+
+
+    <script>
+        let entries = JSON.parse(localStorage.getItem('diary_data') || '[]');
+        let currentTab = 'edit';
+        let dbFilter = 'all'; 
+        let currentDate = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+        let searchQuery = '';
+
+
+        window.onload = () => {
+            // アプリ起動時は常に「今日」の「記録」画面を表示
+            currentTab = 'edit';
+            currentDate = new Date().toLocaleDateString('sv-SE');
+            
+            const datePicker = document.getElementById('datePicker');
+            datePicker.value = currentDate;
+            datePicker.onchange = (e) => {
+                currentDate = e.target.value;
+                render();
+            };
+            render();
+        };
+
+
+        function save() {
+            localStorage.setItem('diary_data', JSON.stringify(entries));
+        }
+
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2000);
+        }
+
+
+        function toggleExportMenu() {
+            document.getElementById('exportMenu').classList.toggle('hidden');
+        }
+
+
+        function exportJSON() {
+            const dataStr = JSON.stringify(entries, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', `mind_db_${currentDate}.json`);
+            linkElement.click();
+            toggleExportMenu();
+            showToast('バックアップを保存しました');
+        }
+
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        if (confirm('現在のデータを上書きしますか？')) {
+                            entries = importedData;
+                            save();
+                            render();
+                            showToast('データを復元しました');
+                        }
+                    }
+                } catch (err) { alert('読み込みに失敗しました'); }
+            };
+            reader.readAsText(file);
+            toggleExportMenu();
+            event.target.value = '';
+        }
+
+
+        function copyToClipboard() {
+            let text = "【MIND DB エクスポート】\n\n";
+            entries.forEach(en => {
+                en.episodes.forEach(ep => {
+                    if (!ep.fact && !ep.abstraction && !ep.application) return;
+                    const clean = (html) => {
+                        const div = document.createElement('div');
+                        div.innerHTML = html;
+                        return div.textContent || div.innerText || "";
+                    };
+                    text += `■ ${en.date} ${ep.slogan ? `【${ep.slogan}】` : ''} [${ep.category || '未分類'}]\n`;
+                    if (ep.fact) text += `【Fact】\n${clean(ep.fact)}\n\n`;
+                    if (ep.abstraction) text += `【Abstraction】\n${clean(ep.abstraction)}\n\n`;
+                    if (ep.application) text += `【Application】\n${clean(ep.application)}\n\n`;
+                    text += `------------------------------------------\n\n`;
+                });
+            });
+            const el = document.createElement('textarea');
+            el.value = text.trim();
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            toggleExportMenu();
+            showToast('テキストをコピーしました');
+        }
+
+
+        function formatDoc(cmd, value = null) {
+            document.execCommand(cmd, false, value);
+        }
+
+
+        function handleKeyDown(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const selection = window.getSelection();
+                if (!selection.rangeCount) return;
+                let container = selection.anchorNode;
+                while (container && container.nodeName !== 'LI' && !container.classList?.contains('editor-content')) {
+                    container = container.parentNode;
+                }
+                if (container && container.nodeName === 'LI') {
+                    if (e.shiftKey) document.execCommand('outdent', false, null);
+                    else document.execCommand('indent', false, null);
+                }
+            }
+        }
+
+
+        function switchTab(tab) {
+            currentTab = tab;
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            render();
+        }
+
+
+        function setDbFilter(filter) {
+            dbFilter = filter;
+            render();
+        }
+
+
+        function addEpisode() {
+            let entry = entries.find(e => e.date === currentDate);
+            if (!entry) {
+                entry = { date: currentDate, episodes: [] };
+                entries.push(entry);
+            }
+            entry.episodes.push({ 
+                id: Date.now(), 
+                category: '', 
+                slogan: '',
+                fact: '', 
+                abstraction: '', 
+                application: '' 
+            });
+            save();
+            render();
+        }
+
+
+        function updateEntry(episodeId, field, value) {
+            let entry = entries.find(e => e.date === currentDate);
+            if (!entry) return;
+            let ep = entry.episodes.find(ep => ep.id === episodeId);
+            if (!ep) return;
+            ep[field] = value;
+            save();
+        }
+
+
+        function deleteEpisode(episodeId) {
+            if(!confirm('このエピソードを削除しますか？')) return;
+            let entry = entries.find(e => e.date === currentDate);
+            if (!entry) return;
+            entry.episodes = entry.episodes.filter(ep => ep.id !== episodeId);
+            save();
+            render();
+        }
+
+
+        function toggleCard(el) {
+            el.classList.toggle('expanded');
+        }
+
+
+        function handleSearch(inputEl) {
+            searchQuery = inputEl.value.toLowerCase();
+            renderDbList();
+        }
+
+
+        function renderDbList() {
+            const listContainer = document.getElementById('dbListContainer');
+            if (!listContainer) return;
+
+
+            let allEpisodes = entries.flatMap(en => en.episodes.map(ep => ({...ep, date: en.date})));
+            let filtered = allEpisodes.filter(ep => 
+                (ep.fact + ep.abstraction + ep.application + (ep.category||'') + (ep.slogan || '')).toLowerCase().includes(searchQuery)
+            );
+
+
+            let grouped = filtered.reduce((acc, ep) => {
+                let cat = ep.category || '未分類';
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(ep);
+                return acc;
+            }, {});
+
+
+            const html = Object.keys(grouped).sort().map(cat => {
+                const itemsHtml = grouped[cat].map(ep => {
+                    let sections = [];
+                    if (dbFilter === 'all') {
+                        if (ep.fact) sections.push(`<div class="mb-4"><span class="section-label label-fact">Fact</span><div class="display-content text-[13px] text-slate-500 leading-relaxed line-clamp-custom">${ep.fact}</div></div>`);
+                        if (ep.abstraction) sections.push(`<div class="mb-4"><span class="section-label label-abs">Abstraction</span><div class="display-content text-base font-bold text-slate-900 leading-snug line-clamp-custom">${ep.abstraction}</div></div>`);
+                        if (ep.application) sections.push(`<div><span class="section-label label-app">Application</span><div class="display-content text-[13px] text-slate-600 font-medium leading-relaxed line-clamp-custom">${ep.application}</div></div>`);
+                    } else {
+                        const field = dbFilter;
+                        const labelClass = dbFilter === 'abstraction' ? 'label-abs' : 'label-app';
+                        if (ep[field]) sections.push(`<div><span class="section-label ${labelClass}">${field}</span><div class="display-content text-base font-bold text-slate-900 leading-snug line-clamp-custom">${ep[field]}</div></div>`);
+                    }
+                    if (sections.length === 0) return '';
+                    return `
+                        <div onclick="toggleCard(this)" class="db-card bg-white p-6 rounded-[1.5rem] border border-slate-100 shadow-sm active:scale-[0.98] transition-all">
+                            <div class="flex justify-between items-start mb-4 gap-4">
+                                <div class="text-[10px] font-black text-slate-300 whitespace-nowrap uppercase tracking-widest">${ep.date}</div>
+                                ${ep.slogan ? `<div class="text-[11px] font-black text-indigo-500 text-right line-clamp-1 italic"># ${ep.slogan}</div>` : ''}
+                            </div>
+                            ${sections.join('')}
+                        </div>
+                    `;
+                }).join('');
+
+
+                if (!itemsHtml.trim()) return '';
+                return `
+                    <div class="mb-10">
+                        <h3 class="flex items-center gap-3 text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-5 ml-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> ${cat}
+                        </h3>
+                        <div class="space-y-4">${itemsHtml}</div>
+                    </div>
+                `;
+            }).join('') || '<div class="text-center py-32 text-slate-300 font-bold italic">No data found.</div>';
+
+
+            listContainer.innerHTML = html;
+        }
+
+
+        function render() {
+            const app = document.getElementById('app');
+            const exportMenuBtn = document.getElementById('exportMenuBtn');
+            const datePicker = document.getElementById('datePicker');
+            
+            datePicker.value = currentDate;
+            document.getElementById('tabEdit').className = `flex flex-col items-center gap-1 w-20 transition-all ${currentTab === 'edit' ? 'text-indigo-600 scale-110' : 'text-slate-300'}`;
+            document.getElementById('tabDb').className = `flex flex-col items-center gap-1 w-20 transition-all ${currentTab === 'db' ? 'text-indigo-600 scale-110' : 'text-slate-300'}`;
+            exportMenuBtn.classList.toggle('hidden', currentTab !== 'db');
+
+
+            if (currentTab === 'edit') {
+                let entry = entries.find(e => e.date === currentDate);
+                let episodesHtml = (entry?.episodes || []).map(ep => `
+                    <div class="bg-white rounded-[2rem] shadow-sm border border-slate-100 mb-8 relative overflow-hidden">
+                        <div class="bg-slate-50/70 border-b border-slate-100 p-2.5 flex justify-between items-center px-4">
+                            <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                                <button onmousedown="event.preventDefault(); formatDoc('bold')" class="toolbar-btn text-slate-600"><i class="fas fa-bold text-sm"></i></button>
+                                <button onmousedown="event.preventDefault(); formatDoc('insertUnorderedList')" class="toolbar-btn text-slate-600"><i class="fas fa-list-ul text-sm"></i></button>
+                                <div class="w-px h-5 bg-slate-200 mx-1"></div>
+                                <button onmousedown="event.preventDefault(); formatDoc('foreColor', '#e11d48')" class="toolbar-btn text-rose-500"><i class="fas fa-circle text-[10px]"></i></button>
+                                <button onmousedown="event.preventDefault(); formatDoc('foreColor', '#10b981')" class="toolbar-btn text-emerald-500"><i class="fas fa-circle text-[10px]"></i></button>
+                                <button onmousedown="event.preventDefault(); formatDoc('foreColor', '#2563eb')" class="toolbar-btn text-blue-500"><i class="fas fa-circle text-[10px]"></i></button>
+                                <button onmousedown="event.preventDefault(); formatDoc('foreColor', '#1e293b')" class="toolbar-btn text-slate-800"><i class="fas fa-undo text-[10px]"></i></button>
+                            </div>
+                            <button onclick="deleteEpisode(${ep.id})" class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-rose-500"><i class="fas fa-trash-alt text-sm"></i></button>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex flex-col gap-3 mb-6">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-folder text-slate-300 text-xs"></i>
+                                    <input type="text" oninput="updateEntry(${ep.id}, 'category', this.value)" value="${ep.category || ''}" placeholder="カテゴリ" class="text-xs font-black text-slate-400 border-b border-slate-50 focus:border-slate-200 outline-none w-full uppercase tracking-[0.2em] bg-transparent py-1">
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-quote-left text-indigo-200 text-xs"></i>
+                                    <input type="text" oninput="updateEntry(${ep.id}, 'slogan', this.value)" value="${ep.slogan || ''}" placeholder="標語（一言で！）" class="text-sm font-bold text-indigo-500 border-b border-indigo-50/50 focus:border-indigo-100 outline-none w-full bg-transparent py-1">
+                                </div>
+                            </div>
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1.5 block">Fact</label>
+                                    <div contenteditable="true" placeholder="何が起きたか？" onkeydown="handleKeyDown(event)" oninput="updateEntry(${ep.id}, 'fact', this.innerHTML)" class="editor-content text-slate-700 leading-relaxed">${ep.fact}</div>
+                                </div>
+                                <div class="border-t border-slate-50 pt-4">
+                                    <label class="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5 block">Abstraction</label>
+                                    <div contenteditable="true" placeholder="気づきは？" onkeydown="handleKeyDown(event)" oninput="updateEntry(${ep.id}, 'abstraction', this.innerHTML)" class="editor-content text-slate-900 font-bold leading-relaxed">${ep.abstraction}</div>
+                                </div>
+                                <div class="border-t border-slate-50 pt-4">
+                                    <label class="text-[10px] font-black text-emerald-300 uppercase tracking-widest mb-1.5 block">Application</label>
+                                    <div contenteditable="true" placeholder="次はどうするか？" onkeydown="handleKeyDown(event)" oninput="updateEntry(${ep.id}, 'application', this.innerHTML)" class="editor-content text-slate-700 leading-relaxed">${ep.application}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+
+                app.innerHTML = `
+                    <div class="flex justify-between items-center mb-8 px-1">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-800 tracking-tight">記録</h2>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">${currentDate}</p>
+                        </div>
+                        <button onclick="addEpisode()" class="bg-indigo-600 text-white w-12 h-12 rounded-2xl shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] active:scale-90 flex items-center justify-center transition-all"><i class="fas fa-plus text-lg"></i></button>
+                    </div>
+                    ${episodesHtml || `<div class="text-center py-24 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100 text-slate-300 px-10"><p class="text-sm font-bold leading-relaxed">記録がありません。</p></div>`}
+                `;
+            } else {
+                app.innerHTML = `
+                    <div class="mb-8 px-1">
+                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">知恵の蔵</h2>
+                    </div>
+                    <div class="mb-6 relative">
+                        <i class="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                        <input type="text" oninput="handleSearch(this)" id="searchInput" value="${searchQuery}" placeholder="キーワード・標語で検索" 
+                            class="w-full pl-14 pr-6 py-4.5 bg-white border border-slate-100 rounded-2xl shadow-sm outline-none focus:ring-4 focus:ring-indigo-50/50 transition-all text-slate-700">
+                    </div>
+                    <div class="flex gap-2 mb-8 overflow-x-auto no-scrollbar pb-2">
+                        <button onclick="setDbFilter('all')" class="filter-chip ${dbFilter === 'all' ? 'active' : ''}">すべて</button>
+                        <button onclick="setDbFilter('abstraction')" class="filter-chip ${dbFilter === 'abstraction' ? 'active' : ''}">Abstraction</button>
+                        <button onclick="setDbFilter('application')" class="filter-chip ${dbFilter === 'application' ? 'active' : ''}">Application</button>
+                    </div>
+                    <div id="dbListContainer"></div>
+                `;
+                renderDbList();
+            }
+        }
+    </script>
+</body>
+</html>
